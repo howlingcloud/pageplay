@@ -3,7 +3,7 @@ import pandas as pd
 import pdfplumber
 import re
 
-# Configure the Streamlit page
+# Streamlit setup
 st.set_page_config(page_title="PagePlay", layout="wide")
 st.title("🎬 PagePlay")
 st.subheader("Write. Camera. Action.")
@@ -12,14 +12,21 @@ uploaded_file = st.file_uploader("Upload your screenplay PDF", type=["pdf"])
 
 if uploaded_file:
     with st.spinner("Parsing PDF..."):
+        # Extract text from PDF
         text_lines = []
         with pdfplumber.open(uploaded_file) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
                     text_lines.extend(text.split('\n'))
+                else:
+                    st.warning(f"Could not extract text from page {page.page_number}")
 
-        # Initialize parsing
+        if not text_lines:
+            st.error("No extractable text found in the PDF.")
+            st.stop()
+
+        # Initialize variables
         parsed_shots = []
         current_scene = ""
         location = ""
@@ -71,14 +78,12 @@ if uploaded_file:
                     shot_counter += 1
                 continue
 
-            # Action or other lines
+            # Action or other text
             elif line:
-                # Sound detection
                 sound = ""
                 if "SOUND OF" in line.upper() or any(word in line.upper() for word in ["WHOOSH", "BOOM", "SCREECH", "ECHO"]):
                     sound = line
 
-                # Prop detection (all caps words longer than 1 char)
                 props = re.findall(r'\b[A-Z]{2,}\b', line)
                 props_str = "\n".join(set(props)) if props else ""
 
@@ -106,7 +111,7 @@ if uploaded_file:
             else:
                 i += 1
 
-        # ✅ Only display results if parsing succeeded
+        # Display results
         if parsed_shots:
             df = pd.DataFrame(parsed_shots)
             timeline_df = df.set_index("Shot").T
@@ -118,4 +123,3 @@ if uploaded_file:
             st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
         else:
             st.error("No valid content was parsed. Please upload a formatted screenplay PDF.")
-
