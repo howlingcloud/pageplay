@@ -29,8 +29,9 @@ def extract_camera_phrase(line):
     return ""
 
 def extract_art_props(line):
-    # Detect phrases with multiple ALL CAPS words
-    return "\n".join(re.findall(r'\b([A-Z][A-Z0-9\-]{1,}(?:\s+[A-Z][A-Z0-9\-]{1,})+)\b', line))
+    # Capture both single and multi-word ALL CAPS phrases (props)
+    phrases = re.findall(r'\b(?:[A-Z0-9\-]{2,})(?:\s+[A-Z0-9\-]{2,})*\b', line)
+    return "\n".join(set(phrases))
 
 # --- Core Parser ---
 def parse_script(text):
@@ -39,6 +40,7 @@ def parse_script(text):
 
     current_shot = {
         "Shot": 1,
+        "Scene Summary": ""
         "Location": "",
         "Time of Day": "",
         "Character": "",
@@ -48,7 +50,7 @@ def parse_script(text):
         "Sound Design": "",
         "Camera": "",
         "EDIT": "",
-        "Scene Summary": ""
+        
     }
 
     scene_summary = ""
@@ -69,7 +71,7 @@ def parse_script(text):
     for i, line in enumerate(lines):
         line = line.strip()
         if not line:
-            # Paragraph break
+            # Paragraph break = end of thought
             if current_shot["Action"] or current_shot["Dialogue"]:
                 flush_shot()
             in_dialogue = False
@@ -111,8 +113,8 @@ def parse_script(text):
         if not current_shot["Time of Day"]:
             current_shot["Time of Day"] = last_time
 
+        # Character cue
         if line.isupper() and len(line.split()) <= 5:
-            # New character
             flush_shot()
             current_shot["Character"] = line
             in_dialogue = True
@@ -122,9 +124,12 @@ def parse_script(text):
             current_shot["Dialogue"] += line + " "
             continue
 
-        if extract_art_props(line):
-            current_shot["Art"] += extract_art_props(line) + "\n"
+        # Prop detection (multi-word ALL CAPS)
+        art = extract_art_props(line)
+        if art:
+            current_shot["Art"] += art + "\n"
 
+        # Default: treat as action
         current_shot["Action"] += line + " "
 
     flush_shot()
