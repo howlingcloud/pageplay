@@ -106,15 +106,16 @@ if uploaded_file:
             else:
                 i += 1
 
-        # Convert to DataFrame and transpose
-        df = pd.DataFrame(parsed_shots)
-        timeline_df = df.set_index("Shot").T
+# After parsing and populating parsed_shots
+df = pd.DataFrame(parsed_shots)
+timeline_df = df.set_index("Shot").T
 
-        st.success("Parsing complete!")
-        st.dataframe(timeline_df, use_container_width=True)
+st.success("Parsing complete!")
+st.dataframe(timeline_df, use_container_width=True)
 
-        csv = timeline_df.to_csv().encode('utf-8')
-        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+csv = timeline_df.to_csv().encode('utf-8')
+st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+
 
 
 
