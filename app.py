@@ -103,34 +103,18 @@ if uploaded_file:
                 i += 1
                 continue
 
-                    else:
-            i += 1
+            else:
+                i += 1
 
-# ✅ Only continue if something was parsed
-if parsed_shots:
-    df = pd.DataFrame(parsed_shots)
-    timeline_df = df.set_index("Shot").T
+        # ✅ Only display results if parsing succeeded
+        if parsed_shots:
+            df = pd.DataFrame(parsed_shots)
+            timeline_df = df.set_index("Shot").T
 
-    st.success("Parsing complete!")
-    st.dataframe(timeline_df, use_container_width=True)
+            st.success("Parsing complete!")
+            st.dataframe(timeline_df, use_container_width=True)
 
-    csv = timeline_df.to_csv().encode('utf-8')
-    st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
-else:
-    st.error("No valid content was parsed. Please upload a formatted screenplay PDF.")
-
-
-# After parsing and populating parsed_shots
-df = pd.DataFrame(parsed_shots)
-timeline_df = df.set_index("Shot").T
-
-st.success("Parsing complete!")
-st.dataframe(timeline_df, use_container_width=True)
-
-csv = timeline_df.to_csv().encode('utf-8')
-st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
-
-
-
-
-
+            csv = timeline_df.to_csv().encode('utf-8')
+            st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+        else:
+            st.error("No valid content was parsed. Please upload a formatted screenplay PDF.")
