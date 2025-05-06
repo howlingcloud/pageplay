@@ -108,7 +108,6 @@ if uploaded_file:
 
         # ✅ Only display results if parsing succeeded
         if parsed_shots:
-            parsed_rows = parse_script(uploaded_file)  # or similar logic
             df = pd.DataFrame(parsed_shots)
             timeline_df = df.set_index("Shot").T
 
@@ -119,3 +118,4 @@ if uploaded_file:
             st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
         else:
             st.error("No valid content was parsed. Please upload a formatted screenplay PDF.")
+
