@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import pdfplumber
+import re
 
-# Set up the app layout and title
+# Configure the Streamlit page
 st.set_page_config(page_title="PagePlay", layout="wide")
 st.title("🎬 PagePlay")
 st.subheader("Write. Camera. Action.")
 
-# Upload a screenplay PDF
 uploaded_file = st.file_uploader("Upload your screenplay PDF", type=["pdf"])
 
 if uploaded_file:
@@ -19,36 +19,103 @@ if uploaded_file:
                 if text:
                     text_lines.extend(text.split('\n'))
 
-        # Basic placeholder parser logic (replace with real parsing logic)
-        parsed_rows = []
-        for i, line in enumerate(text_lines[:30]):  # Limit to first 30 lines for testing
-            parsed_rows.append({
-                "Scene Description": f"Scene {i//5 + 1}",
-                "Shot": f"Shot {i + 1}",
-                "Shot Description": line,
-                "Location": "",
-                "Time of Day": "",
-                "Character": "",
-                "Dialogue": "",
-                "Action": line if line.isupper() else "",
-                "Sound Design": "",
-                "Camera": "",
-                "Art/Props": "",
-                "Tone": "",
-                "EDIT": ""
-            })
+        # Initialize parsing
+        parsed_shots = []
+        current_scene = ""
+        location = ""
+        time_of_day = ""
+        shot_counter = 1
+        i = 0
 
-       
-        # Convert parsed row data to timeline format
-df = pd.DataFrame(parsed_rows)
-timeline_df = df.set_index("Shot").T  # Transpose: shots become columns
+        while i < len(text_lines):
+            line = text_lines[i].strip()
 
-# Display in correct NLE-style layout
-st.dataframe(timeline_df, use_container_width=True)
+            # Scene heading
+            if re.match(r'^(INT\.|EXT\.)', line):
+                current_scene = line
+                location_match = re.match(r'^(INT\.|EXT\.)\s+(.+?)\s*-\s*(\w+)', line)
+                if location_match:
+                    location = location_match.group(2).strip()
+                    time_of_day = location_match.group(3).strip()
+                i += 1
+                continue
 
-# Download correctly formatted timeline
-csv = timeline_df.to_csv().encode('utf-8')
-st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+            # Character + Dialogue
+            elif line.isupper() and 1 <= len(line) <= 30:
+                character = line
+                is_vo = "(V.O.)" in character or "(O.S.)" in character
+                dialogue = ""
+                i += 1
+                while i < len(text_lines) and text_lines[i].strip() and not text_lines[i].isupper():
+                    dialogue += text_lines[i].strip() + " "
+                    i += 1
+
+                shot_data = {
+                    "Scene Description": current_scene,
+                    "Shot": f"Shot {shot_counter}",
+                    "Shot Description": dialogue.strip(),
+                    "Location": location,
+                    "Time of Day": time_of_day,
+                    "Character": character,
+                    "Dialogue": dialogue.strip(),
+                    "Action": "" if not is_vo else dialogue.strip(),
+                    "Sound Design": "",
+                    "Camera": "",
+                    "Art/Props": "",
+                    "Tone": "",
+                    "EDIT": ""
+                }
+
+                parsed_shots.append(shot_data)
+                if not is_vo:
+                    shot_counter += 1
+                continue
+
+            # Action or other lines
+            elif line:
+                # Sound detection
+                sound = ""
+                if "SOUND OF" in line.upper() or any(word in line.upper() for word in ["WHOOSH", "BOOM", "SCREECH", "ECHO"]):
+                    sound = line
+
+                # Prop detection (all caps words longer than 1 char)
+                props = re.findall(r'\b[A-Z]{2,}\b', line)
+                props_str = "\n".join(set(props)) if props else ""
+
+                shot_data = {
+                    "Scene Description": current_scene,
+                    "Shot": f"Shot {shot_counter}",
+                    "Shot Description": line,
+                    "Location": location,
+                    "Time of Day": time_of_day,
+                    "Character": "",
+                    "Dialogue": "",
+                    "Action": line,
+                    "Sound Design": sound,
+                    "Camera": "",
+                    "Art/Props": props_str,
+                    "Tone": "",
+                    "EDIT": ""
+                }
+
+                parsed_shots.append(shot_data)
+                shot_counter += 1
+                i += 1
+                continue
+
+            else:
+                i += 1
+
+        # Convert to DataFrame and transpose
+        df = pd.DataFrame(parsed_shots)
+        timeline_df = df.set_index("Shot").T
+
+        st.success("Parsing complete!")
+        st.dataframe(timeline_df, use_container_width=True)
+
+        csv = timeline_df.to_csv().encode('utf-8')
+        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+
 
 
 
