@@ -54,5 +54,6 @@ if uploaded_file:
 
         # Download option
         csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv")
+        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+
 
