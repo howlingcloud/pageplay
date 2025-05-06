@@ -108,6 +108,7 @@ if uploaded_file:
 
         # ✅ Only display results if parsing succeeded
         if parsed_shots:
+            parsed_rows = parse_script(uploaded_file)  # or similar logic
             df = pd.DataFrame(parsed_shots)
             timeline_df = df.set_index("Shot").T
 
