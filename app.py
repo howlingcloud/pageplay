@@ -38,17 +38,15 @@ if uploaded_file:
                 "EDIT": ""
             })
 
-        # Convert to DataFrame and pivot to timeline format
-        df = pd.DataFrame(parsed_rows)
-        timeline_df = df.set_index("Shot").T  # Transpose so shots are columns
+       
+        # Convert parsed row data to timeline format
+df = pd.DataFrame(parsed_rows)
+timeline_df = df.set_index("Shot").T  # Transpose: shots become columns
 
-        st.success("Parsing complete!")
+# Display in correct NLE-style layout
+st.dataframe(timeline_df, use_container_width=True)
 
-        # Show the horizontal timeline grid
-        st.dataframe(timeline_df, use_container_width=True)
-
-
-# Download option
+# Download correctly formatted timeline
 csv = timeline_df.to_csv().encode('utf-8')
 st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
 
