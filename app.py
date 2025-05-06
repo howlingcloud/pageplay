@@ -106,6 +106,13 @@ if uploaded_file:
             else:
                 i += 1
 
+if 'timeline_df' in locals():
+    st.success("Parsing complete!")
+    st.dataframe(timeline_df, use_container_width=True)
+
+    csv = timeline_df.to_csv().encode('utf-8')
+    st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
+
 # After parsing and populating parsed_shots
 df = pd.DataFrame(parsed_shots)
 timeline_df = df.set_index("Shot").T
