@@ -5,7 +5,7 @@ import re
 
 st.set_page_config(page_title="PagePlay", layout="wide")
 st.title("🎬 PagePlay")
-st.subheader("Upload a screenplay and parse a shot-level timeline.")
+st.subheader("Upload a screenplay and generate a shot-level timeline.")
 
 # --- Utility functions ---
 def is_scene_heading(line):
@@ -15,12 +15,12 @@ def is_transition(line):
     return line.strip().endswith("TO:") or line.strip() in ["FADE IN:", "FADE OUT:"]
 
 def is_sound_cue(line):
-    sound_keywords = ['SOUND', 'HEAR', 'ECHO', 'WHOOSH', 'SCREECH', 'BOOM', 'THUNDER']
-    return any(kw in line.upper() for kw in sound_keywords)
+    keywords = ['SOUND', 'HEAR', 'ECHO', 'WHOOSH', 'SCREECH', 'BOOM', 'THUNDER']
+    return any(kw in line.upper() for kw in keywords)
 
 def is_camera_direction(line):
-    camera_keywords = ['WE SEE', 'WE ARE', 'WE MOVE', 'WE FLY', 'CAMERA', 'TRACK', 'ZOOM', 'PAN', 'CRANE', 'STEADICAM', 'LONG LENS', 'OVERHEAD']
-    return any(kw in line.upper() for kw in camera_keywords)
+    keywords = ['WE SEE', 'WE ARE', 'WE MOVE', 'WE FLY', 'CAMERA', 'TRACK', 'ZOOM', 'PAN', 'CRANE', 'STEADICAM', 'LONG LENS', 'OVERHEAD']
+    return any(kw in line.upper() for kw in keywords)
 
 def extract_camera_phrase(line):
     for kw in ['WE SEE', 'WE ARE', 'WE MOVE', 'WE FLY', 'CAMERA MOVES', 'TRACKING', 'LONG LENS']:
@@ -28,21 +28,15 @@ def extract_camera_phrase(line):
             return kw
     return ""
 
-def infer_location_from_line(line):
-    location_keywords = ['forest', 'jungle', 'beach', 'desert', 'ocean', 'mountain', 'valley', 'cave']
-    words = line.lower().split()
-    for word in words:
-        if word in location_keywords:
-            return word.capitalize()
-    return ""
+def extract_art_props(line):
+    # Detect phrases with multiple ALL CAPS words
+    return "\n".join(re.findall(r'\b([A-Z][A-Z0-9\-]{1,}(?:\s+[A-Z][A-Z0-9\-]{1,})+)\b', line))
 
-def split_into_sentences(text):
-    return re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
-
-# --- Parser core ---
+# --- Core Parser ---
 def parse_script(text):
     lines = text.splitlines()
     shots = []
+
     current_shot = {
         "Shot": 1,
         "Location": "",
@@ -56,32 +50,39 @@ def parse_script(text):
         "EDIT": "",
         "Scene Summary": ""
     }
-    scene_summary_text = ""
-    summary_set = False
-    last_explicit_location = ""
+
+    scene_summary = ""
+    in_dialogue = False
+    last_scene_summary = ""
+    last_location = ""
+    last_time = ""
 
     def flush_shot():
-        nonlocal current_shot, summary_set
-        current_shot["Scene Summary"] = scene_summary_text
-        shots.append(current_shot.copy())
-        current_shot["Shot"] += 1
-        for key in ["Character", "Action", "Dialogue", "Art", "Sound Design", "Camera", "EDIT"]:
-            current_shot[key] = ""
-        summary_set = False
+        nonlocal current_shot, shots
+        if current_shot["Action"].strip() or current_shot["Dialogue"].strip() or current_shot["Character"]:
+            current_shot["Scene Summary"] = last_scene_summary
+            shots.append(current_shot.copy())
+            current_shot["Shot"] += 1
+            for key in ["Character", "Action", "Dialogue", "Art", "Sound Design", "Camera", "EDIT"]:
+                current_shot[key] = ""
 
-    for line in lines:
+    for i, line in enumerate(lines):
         line = line.strip()
         if not line:
+            # Paragraph break
+            if current_shot["Action"] or current_shot["Dialogue"]:
+                flush_shot()
+            in_dialogue = False
             continue
 
         if is_scene_heading(line):
-            scene_summary_text = ""
-            if current_shot["Action"] or current_shot["Dialogue"]:
-                flush_shot()
+            flush_shot()
             parts = line.split(" - ")
             current_shot["Location"] = parts[0].strip()
-            last_explicit_location = current_shot["Location"]
             current_shot["Time of Day"] = parts[1].strip() if len(parts) > 1 else ""
+            last_location = current_shot["Location"]
+            last_time = current_shot["Time of Day"]
+            scene_summary = ""
             continue
 
         if is_transition(line):
@@ -101,41 +102,35 @@ def parse_script(text):
                 current_shot["Action"] += remainder + " "
             continue
 
-        if not scene_summary_text and not is_camera_direction(line) and not is_sound_cue(line):
-            scene_summary_text = line
+        if not scene_summary:
+            scene_summary = line
+            last_scene_summary = scene_summary
 
-        if not current_shot["Location"] and last_explicit_location == "":
-            inferred = infer_location_from_line(line)
-            if inferred:
-                current_shot["Location"] = inferred
+        if not current_shot["Location"]:
+            current_shot["Location"] = last_location
+        if not current_shot["Time of Day"]:
+            current_shot["Time of Day"] = last_time
 
         if line.isupper() and len(line.split()) <= 5:
+            # New character
+            flush_shot()
             current_shot["Character"] = line
+            in_dialogue = True
             continue
 
-        if line.startswith("(") and line.endswith(")"):
+        if in_dialogue:
             current_shot["Dialogue"] += line + " "
             continue
 
-        if any(char.isupper() for char in line) and len(line.split()) <= 7 and not is_scene_heading(line):
-            current_shot["Art"] += line + " "
-            continue
+        if extract_art_props(line):
+            current_shot["Art"] += extract_art_props(line) + "\n"
 
-        if current_shot["Character"]:
-            current_shot["Dialogue"] += line + " "
-            continue
-
-        # Otherwise treat as action
-        sentences = split_into_sentences(line)
-        for sentence in sentences:
-            if current_shot["Action"]:
-                flush_shot()
-            current_shot["Action"] = sentence.strip()
+        current_shot["Action"] += line + " "
 
     flush_shot()
     return pd.DataFrame(shots)
 
-# --- Streamlit logic ---
+# --- Streamlit UI ---
 uploaded_file = st.file_uploader("Upload your screenplay PDF", type=["pdf"])
 
 if uploaded_file:
@@ -154,7 +149,7 @@ if uploaded_file:
             df_transposed = df.set_index("Shot").T.reset_index()
             df_transposed.rename(columns={"index": "Field"}, inplace=True)
 
-            st.success("Parsing complete!")
+            st.success("Parsing complete! Timeline below 👇")
             st.dataframe(df_transposed, use_container_width=True)
 
             csv = df_transposed.to_csv(index=False).encode('utf-8')
