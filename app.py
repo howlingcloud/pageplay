@@ -47,13 +47,10 @@ if uploaded_file:
         # Show the horizontal timeline grid
         st.dataframe(timeline_df, use_container_width=True)
 
-        # Provide download option
-        csv = timeline_df.to_csv()
-        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv")
 
+# Download option
+csv = timeline_df.to_csv().encode('utf-8')
+st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
 
-        # Download option
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("Download Timeline CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
 
 
