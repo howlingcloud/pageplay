@@ -40,7 +40,6 @@ def parse_script(text):
 
     current_shot = {
         "Shot": 1,
-        "Scene Summary": ""
         "Location": "",
         "Time of Day": "",
         "Character": "",
@@ -50,7 +49,7 @@ def parse_script(text):
         "Sound Design": "",
         "Camera": "",
         "EDIT": "",
-        
+        "Scene Summary": ""
     }
 
     scene_summary = ""
