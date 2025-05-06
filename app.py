@@ -24,9 +24,10 @@ if uploaded_file:
             st.error("No extractable text found in the PDF.")
             st.stop()
 
-        # Parse screenplay
+        # Initialize
         parsed_shots = []
         current_scene = ""
+        scene_description = ""
         location = ""
         time_of_day = ""
         shot_counter = 1
@@ -38,6 +39,7 @@ if uploaded_file:
             # Scene heading
             if re.match(r'^(INT\.|EXT\.)', line):
                 current_scene = line
+                scene_description = ""
                 location_match = re.match(r'^(INT\.|EXT\.)\s+(.+?)\s*-\s*(\w+)', line)
                 if location_match:
                     location = location_match.group(2).strip()
@@ -56,7 +58,7 @@ if uploaded_file:
                     i += 1
 
                 shot_data = {
-                    "Scene Description": current_scene,
+                    "Scene Description": scene_description.strip(),
                     "Shot": f"Shot {shot_counter}",
                     "Shot Description": dialogue.strip(),
                     "Location": location,
@@ -72,11 +74,10 @@ if uploaded_file:
                 }
 
                 parsed_shots.append(shot_data)
-                if not is_vo:
-                    shot_counter += 1
+                shot_counter += 1
                 continue
 
-            # Action or Description lines
+            # Action or scene body text
             elif line:
                 sound = ""
                 if "SOUND OF" in line.upper() or any(word in line.upper() for word in ["WHOOSH", "BOOM", "SCREECH", "ECHO", "SCREAM", "CLICK"]):
@@ -85,8 +86,10 @@ if uploaded_file:
                 props = re.findall(r'\b[A-Z]{2,}\b', line)
                 props_str = "\n".join(set(props)) if props else ""
 
+                scene_description += line + " "
+
                 shot_data = {
-                    "Scene Description": current_scene,
+                    "Scene Description": scene_description.strip(),
                     "Shot": f"Shot {shot_counter}",
                     "Shot Description": line,
                     "Location": location,
@@ -109,13 +112,14 @@ if uploaded_file:
             else:
                 i += 1
 
-        # Display results
+        # Output as transposed table with shots as columns
         if parsed_shots:
             df = pd.DataFrame(parsed_shots)
+            timeline_df = df.set_index("Shot").T
             st.success("Parsing complete!")
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(timeline_df, use_container_width=True)
 
-            csv = df.to_csv(index=False).encode('utf-8')
+            csv = timeline_df.to_csv().encode('utf-8')
             st.download_button("Download CSV", csv, "pageplay_timeline.csv", "text/csv", key="download_csv")
         else:
-            st.warning("No valid content was parsed. Make sure your script follows screenplay formatting.")
+            st.warning("No valid content was parsed.")
