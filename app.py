@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 import re
-from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
@@ -17,6 +16,7 @@ st.session_state.setdefault("chunk_metadata", [])
 
 @st.cache_resource
 def load_vector_db():
+    from datasets import load_dataset
     dataset = load_dataset("aneeshas/imsdb-genre-movie-scripts")['train']
     model = SentenceTransformer('all-MiniLM-L6-v2')
 
