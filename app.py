@@ -2,10 +2,42 @@ import streamlit as st
 import pandas as pd
 import pdfplumber
 import re
+from datasets import load_dataset
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
 
 st.set_page_config(page_title="PagePlay", layout="wide")
-st.title("🎬 PagePlay")
+st.title("🎮 PagePlay")
 st.subheader("Upload a screenplay and generate a shot-level timeline.")
+
+# --- Load pretrained script embeddings ---
+st.session_state.setdefault("vector_index", None)
+st.session_state.setdefault("chunk_metadata", [])
+
+@st.cache_resource
+def load_vector_db():
+    dataset = load_dataset("aneeshas/imsdb-genre-movie-scripts")['train']
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+
+    text_chunks = []
+    metadata = []
+    for item in dataset:
+        lines = item['script'].splitlines()
+        for i, line in enumerate(lines):
+            if line.strip():
+                text_chunks.append(line.strip())
+                metadata.append({"text": line.strip(), "movie": item['title'], "genre": item['genre']})
+
+    embeddings = model.encode(text_chunks)
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index.add(np.array(embeddings))
+    return index, metadata
+
+if st.button("Load Pretrained Script Vector DB"):
+    with st.spinner("Loading script embeddings from Hugging Face dataset..."):
+        st.session_state.vector_index, st.session_state.chunk_metadata = load_vector_db()
+    st.success("Vector DB loaded and ready to query!")
 
 # --- Utility functions ---
 def is_scene_heading(line):
@@ -29,7 +61,6 @@ def extract_camera_phrase(line):
     return ""
 
 def extract_art_props(line):
-    # Capture both single and multi-word ALL CAPS phrases (props)
     phrases = re.findall(r'\b(?:[A-Z0-9\-]{2,})(?:\s+[A-Z0-9\-]{2,})*\b', line)
     return "\n".join(set(phrases))
 
@@ -38,19 +69,8 @@ def parse_script(text):
     lines = text.splitlines()
     shots = []
 
-    current_shot = {
-        "Shot": 1,
-        "Location": "",
-        "Time of Day": "",
-        "Character": "",
-        "Action": "",
-        "Dialogue": "",
-        "Art": "",
-        "Sound Design": "",
-        "Camera": "",
-        "EDIT": "",
-        "Scene Summary": ""
-    }
+    current_shot = {"Shot": 1, "Location": "", "Time of Day": "", "Character": "", "Action": "", "Dialogue": "",
+                    "Art": "", "Sound Design": "", "Camera": "", "EDIT": "", "Scene Summary": ""}
 
     scene_summary = ""
     in_dialogue = False
@@ -67,10 +87,9 @@ def parse_script(text):
             for key in ["Character", "Action", "Dialogue", "Art", "Sound Design", "Camera", "EDIT"]:
                 current_shot[key] = ""
 
-    for i, line in enumerate(lines):
+    for line in lines:
         line = line.strip()
         if not line:
-            # Paragraph break = end of thought
             if current_shot["Action"] or current_shot["Dialogue"]:
                 flush_shot()
             in_dialogue = False
@@ -112,7 +131,6 @@ def parse_script(text):
         if not current_shot["Time of Day"]:
             current_shot["Time of Day"] = last_time
 
-        # Character cue
         if line.isupper() and len(line.split()) <= 5:
             flush_shot()
             current_shot["Character"] = line
@@ -123,12 +141,10 @@ def parse_script(text):
             current_shot["Dialogue"] += line + " "
             continue
 
-        # Prop detection (multi-word ALL CAPS)
         art = extract_art_props(line)
         if art:
             current_shot["Art"] += art + "\n"
 
-        # Default: treat as action
         current_shot["Action"] += line + " "
 
     flush_shot()
