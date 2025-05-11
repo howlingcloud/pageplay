@@ -27,7 +27,7 @@ def load_vector_db():
     for item in dataset:
         script = item.get('script')
         if not script:
-            continue  # Skip if missing
+            continue
 
         lines = script.splitlines()
         for line in lines:
@@ -38,6 +38,10 @@ def load_vector_db():
                     "movie": item.get('title', 'Unknown'),
                     "genre": item.get('genre', 'Unknown')
                 })
+
+    if not text_chunks:
+        st.warning("No valid script lines were found in the dataset.")
+        return None, []
 
     embeddings = model.encode(text_chunks)
     index = faiss.IndexFlatL2(embeddings.shape[1])
