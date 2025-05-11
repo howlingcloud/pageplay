@@ -23,20 +23,21 @@ def load_vector_db():
 
     text_chunks = []
     metadata = []
-    for item in dataset:
-    script = item.get('script')
-    if not script:
-        continue  # skip if script is missing
 
-    lines = script.splitlines()
-    for line in lines:
-        if line.strip():
-            text_chunks.append(line.strip())
-            metadata.append({
-                "text": line.strip(),
-                "movie": item.get('title', 'Unknown'),
-                "genre": item.get('genre', 'Unknown')
-            })
+    for item in dataset:
+        script = item.get('script')
+        if not script:
+            continue  # Skip if missing
+
+        lines = script.splitlines()
+        for line in lines:
+            if line.strip():
+                text_chunks.append(line.strip())
+                metadata.append({
+                    "text": line.strip(),
+                    "movie": item.get('title', 'Unknown'),
+                    "genre": item.get('genre', 'Unknown')
+                })
 
     embeddings = model.encode(text_chunks)
     index = faiss.IndexFlatL2(embeddings.shape[1])
