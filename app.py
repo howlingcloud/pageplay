@@ -47,4 +47,7 @@ def load_vector_db():
         return None, []
 
     embeddings = model.encode(text_chunks)
-    index = faiss.IndexFlatL2(embeddings.shape[1]()
+index = faiss.IndexFlatL2(embeddings.shape[1])
+index.add(np.array(embeddings))
+return index, metadata
+
